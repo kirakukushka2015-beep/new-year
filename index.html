@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Таймер Обратного Отсчета</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- tsParticles for Background -->
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.12.0/tsparticles.slim.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .dark .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .dark .glass-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Gradient background effects */
+        .bg-gradient-mesh {
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,25%,1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+        }
+
+        .number-card {
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dark .number-card {
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 relative overflow-x-hidden transition-colors duration-300">
+
+    <!-- Particles Background Container -->
+    <div id="tsparticles" class="fixed inset-0 pointer-events-none z-0 opacity-60 dark:opacity-40"></div>
+
+    <!-- Main Outer Wrapper -->
+    <div class="relative z-10 min-h-screen flex flex-col justify-between p-4 sm:p-6 lg:p-8">
+
+        <!-- Top Header Navigation -->
+        <header class="w-full max-w-5xl mx-auto flex justify-between items-center mb-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
+                    <i class="fa-solid fa-hourglass-half text-lg"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
+                    ChronoTime
+                </h1>
+            </div>
+
+            <!-- Header Action Controls -->
+            <div class="flex items-center space-x-2">
+                <button id="presetsBtn" title="Быстрые пресеты" class="p-2.5 rounded-xl glass-panel hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition text-slate-700 dark:text-slate-300">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span class="hidden sm:inline ml-1.5 text-sm font-medium">Пресеты</span>
+                </button>
+                <button id="savedTimersBtn" title="Сохранённые таймеры" class="p-2.5 rounded-xl glass-panel hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition text-slate-700 dark:text-slate-300 relative">
+                    <i class="fa-solid fa-bookmark"></i>
+                    <span id="savedCountBadge" class="hidden absolute -top-1 -right-1 bg-cyan-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+                </button>
+                <button id="themeToggle" title="Переключить тему" class="p-2.5 rounded-xl glass-panel hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition text-slate-700 dark:text-slate-300">
+                    <i class="fa-solid fa-moon dark:hidden"></i>
+                    <i class="fa-solid fa-sun hidden dark:block text-amber-400"></i>
+                </button>
+                <button id="newTimerBtn" class="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-medium text-sm transition shadow-lg shadow-cyan-500/25 flex items-center space-x-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline">Новый таймер</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="w-full max-w-4xl mx-auto flex-1 flex flex-col items-center justify-center py-6">
+
+            <!-- Active Countdown Card Container -->
+            <div id="countdownContainer" class="w-full flex flex-col items-center text-center">
+                
+                <!-- Tag / Category Badge -->
+                <div id="eventBadge" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300 mb-4 border border-cyan-200 dark:border-cyan-800/50 shadow-sm">
+                    <i class="fa-solid fa-calendar-check mr-1.5"></i>
+                    <span id="eventCategoryText">Событие</span>
+                </div>
+
+                <!-- Event Title -->
+                <h2 id="eventTitle" class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-3 text-slate-900 dark:text-white max-w-2xl leading-tight">
+                    Загрузка таймера...
+                </h2>
+
+                <!-- Event Subtitle / Target Date Description -->
+                <p id="eventTargetDate" class="text-slate-500 dark:text-slate-400 text-sm sm:text-base font-medium mb-10">
+                    --.--.---- 00:00:00
+                </p>
+
+                <!-- Countdown Digits Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 w-full max-w-3xl mb-10">
+                    <!-- Days -->
+                    <div class="glass-panel number-card p-4 sm:p-6 rounded-3xl flex flex-col items-center justify-center border border-white/40 dark:border-slate-800 relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                        <span id="daysVal" class="text-4xl sm:text-6xl font-black text-slate-900 dark:text-white tracking-tight font-mono">00</span>
+                        <span class="text-xs sm:text-sm uppercase tracking-widest font-semibold text-slate-400 dark:text-slate-500 mt-2">Дней</span>
+                    </div>
+
+                    <!-- Hours -->
+                    <div class="glass-panel number-card p-4 sm:p-6 rounded-3xl flex flex-col items-center justify-center border border-white/40 dark:border-slate-800 relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                        <span id="hoursVal" class="text-4xl sm:text-6xl font-black text-slate-900 dark:text-white tracking-tight font-mono">00</span>
+                        <span class="text-xs sm:text-sm uppercase tracking-widest font-semibold text-slate-400 dark:text-slate-500 mt-2">Часов</span>
+                    </div>
+
+                    <!-- Minutes -->
+                    <div class="glass-panel number-card p-4 sm:p-6 rounded-3xl flex flex-col items-center justify-center border border-white/40 dark:border-slate-800 relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                        <span id="minutesVal" class="text-4xl sm:text-6xl font-black text-slate-900 dark:text-white tracking-tight font-mono">00</span>
+                        <span class="text-xs sm:text-sm uppercase tracking-widest font-semibold text-slate-400 dark:text-slate-500 mt-2">Минут</span>
+                    </div>
+
+                    <!-- Seconds -->
+                    <div class="glass-panel number-card p-4 sm:p-6 rounded-3xl flex flex-col items-center justify-center border border-white/40 dark:border-slate-800 relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                        <span id="secondsVal" class="text-4xl sm:text-6xl font-black text-cyan-600 dark:text-cyan-400 tracking-tight font-mono">00</span>
+                        <span class="text-xs sm:text-sm uppercase tracking-widest font-semibold text-slate-400 dark:text-slate-500 mt-2">Секунд</span>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-full max-w-xl bg-slate-200/70 dark:bg-slate-800/70 rounded-full h-2.5 mb-8 overflow-hidden p-0.5 glass-card">
+                    <div id="progressBar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full transition-all duration-500 w-0"></div>
+                </div>
+
+                <!-- Event Finished Banner (Hidden by default) -->
+                <div id="finishedBanner" class="hidden mb-8 p-6 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-center max-w-xl animate-bounce">
+                    <i class="fa-solid fa-gift text-4xl mb-2"></i>
+                    <h3 class="text-2xl font-bold">Событие наступило! 🎉</h3>
+                    <p class="text-sm mt-1 opacity-90">Время вышло, поздравляем!</p>
+                </div>
+
+                <!-- Action Controls for Active Timer -->
+                <div class="flex flex-wrap justify-center gap-3">
+                    <button id="saveCurrentBtn" class="px-4 py-2 rounded-xl glass-panel hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-sm font-medium transition flex items-center space-x-2">
+                        <i class="fa-regular fa-bookmark text-cyan-500"></i>
+                        <span>Сохранить таймер</span>
+                    </button>
+                    <button id="shareBtn" class="px-4 py-2 rounded-xl glass-panel hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-sm font-medium transition flex items-center space-x-2">
+                        <i class="fa-solid fa-share-nodes text-cyan-500"></i>
+                        <span>Поделиться</span>
+                    </button>
+                    <button id="editBtn" class="px-4 py-2 rounded-xl glass-panel hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-sm font-medium transition flex items-center space-x-2">
+                        <i class="fa-solid fa-pen-to-square text-cyan-500"></i>
+                        <span>Изменить</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="w-full max-w-5xl mx-auto text-center py-4 text-xs text-slate-400 dark:text-slate-600">
+            <p>ChronoTime &copy; <span id="currentYear"></span>. Все права защищены. Создавайте красивый отсчет времени.</p>
+        </footer>
+
+    </div>
+
+    <!-- MODAL 1: Create/Edit Timer Modal -->
+    <div id="timerModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/20 dark:border-slate-800 transform scale-95 transition-transform duration-300 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modalTitle" class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-stopwatch text-cyan-500"></i>
+                    Создать таймер
+                </h3>
+                <button class="closeModal text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="timerForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Название события</label>
+                    <input type="text" id="inputTitle" required placeholder="Напр. Мой День Рождения, Отпуск..." 
+                        class="w-full px-4 py-3 rounded-xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-slate-900 dark:text-white">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Дата и время</label>
+                        <input type="datetime-local" id="inputDateTime" required 
+                            class="w-full px-4 py-3 rounded-xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-slate-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Категория</label>
+                        <select id="inputCategory" 
+                            class="w-full px-4 py-3 rounded-xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-slate-900 dark:text-white">
+                            <option value="Праздник">🎉 Праздник</option>
+                            <option value="Отпуск">✈️ Отпуск</option>
+                            <option value="День Рождения">🎂 День Рождения</option>
+                            <option value="Работа/Проект">💼 Работа/Проект</option>
+                            <option value="Важное">⭐ Важное</option>
+                            <option value="Другое">📌 Другое</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Фоновые эффекты</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" data-bg="stars" class="bgOption p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-center hover:border-cyan-500 transition">
+                            ✨ Звезды
+                        </button>
+                        <button type="button" data-bg="bubbles" class="bgOption p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-center hover:border-cyan-500 transition">
+                            🫧 Пузыри
+                        </button>
+                        <button type="button" data-bg="snow" class="bgOption p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-center hover:border-cyan-500 transition">
+                            ❄️ Снег
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" class="closeModal px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-medium text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                        Отмена
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-medium text-sm transition shadow-lg shadow-cyan-500/25">
+                        Запустить таймер
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Presets Modal -->
+    <div id="presetsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/20 dark:border-slate-800 transform scale-95 transition-transform duration-300">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-cyan-500"></i>
+                    Популярные Пресеты
+                </h3>
+                <button class="closeModal text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3" id="presetsList">
+                <!-- Preset Buttons Dynamic Insert -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Saved Timers Drawer/Modal -->
+    <div id="savedTimersModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/20 dark:border-slate-800 transform scale-95 transition-transform duration-300 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-bookmark text-cyan-500"></i>
+                    Сохранённые таймеры
+                </h3>
+                <button class="closeModal text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div id="savedList" class="flex-1 overflow-y-auto space-y-3 pr-1 my-2">
+                <!-- Saved items rendered here -->
+            </div>
+
+            <div id="emptySavedNotice" class="text-center py-8 text-slate-400 dark:text-slate-500 hidden">
+                <i class="fa-regular fa-folder-open text-4xl mb-2"></i>
+                <p class="text-sm">У вас пока нет сохранённых таймеров</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Box -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 glass-panel px-5 py-3 rounded-2xl shadow-xl flex items-center space-x-3 border border-cyan-500/30">
+        <i id="toastIcon" class="fa-solid fa-check-circle text-cyan-500 text-lg"></i>
+        <span id="toastMsg" class="text-sm font-medium text-slate-800 dark:text-slate-100">Сообщение</span>
+    </div>
+
+    <script>
+        let currentTimer = null;
+        let timerInterval = null;
+        let savedTimers = [];
+        let selectedBgEffect = 'stars';
+        let tsParticlesInstance = null;
+
+        // Dom Elements
+        const daysVal = document.getElementById('daysVal');
+        const hoursVal = document.getElementById('hoursVal');
+        const minutesVal = document.getElementById('minutesVal');
+        const secondsVal = document.getElementById('secondsVal');
+        const eventTitle = document.getElementById('eventTitle');
+        const eventTargetDate = document.getElementById('eventTargetDate');
+        const eventCategoryText = document.getElementById('eventCategoryText');
+        const progressBar = document.getElementById('progressBar');
+        const finishedBanner = document.getElementById('finishedBanner');
+
+        // Modals
+        const timerModal = document.getElementById('timerModal');
+        const presetsModal = document.getElementById('presetsModal');
+        const savedTimersModal = document.getElementById('savedTimersModal');
+
+        // Preset Definitions
+        const presetItems = [
+            {
+                title: 'Новый Год 2027',
+                category: 'Праздник',
+                getDate: () => {
+                    const now = new Date();
+                    return new Date(now.getFullYear() + 1, 0, 1, 0, 0, 0);
+                },
+                bg: 'snow'
+            },
+            {
+                title: 'Лето 2027',
+                category: 'Отпуск',
+                getDate: () => {
+                    const now = new Date();
+                    return new Date(2027, 5, 1, 0, 0, 0);
+                },
+                bg: 'bubbles'
+            },
+            {
+                title: 'Конец рабочей недели (Пятница 18:00)',
+                category: 'Важное',
+                getDate: () => {
+                    const now = new Date();
+                    const day = now.getDay();
+                    const diff = (day <= 5 ? 5 - day : 12 - day);
+                    const friday = new Date(now);
+                    friday.setDate(now.getDate() + diff);
+                    friday.setHours(18, 0, 0, 0);
+                    if (friday <= now) friday.setDate(friday.getDate() + 7);
+                    return friday;
+                },
+                bg: 'stars'
+            }
+        ];
+
+        function showToast(message, iconClass = 'fa-solid fa-check-circle') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = message;
+            toastIcon.className = `${iconClass} text-cyan-500 text-lg`;
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Play Completion Sound
+        function playFinishSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+                osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2); // A5
+
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start();
+                osc.stop(ctx.currentTime + 1.2);
+            } catch (e) {
+                console.log('Audio playback prevented or not supported');
+            }
+        }
+
+        // Trigger Confetti Animation
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        function initParticles(type = 'stars') {
+            if (typeof tsParticles === 'undefined') return;
+
+            let options = {
+                fpsLimit: 60,
+                particles: {
+                    number: { value: 40 },
+                    color: { value: "#ffffff" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.3 },
+                    size: { value: { min: 1, max: 3 } },
+                    move: { enable: true, speed: 0.8, direction: "none", outModes: { default: "out" } }
+                }
+            };
+
+            if (type === 'snow') {
+                options.particles.number.value = 60;
+                options.particles.size.value = { min: 2, max: 5 };
+                options.particles.move.direction = "bottom";
+                options.particles.move.speed = 1.5;
+            } else if (type === 'bubbles') {
+                options.particles.number.value = 30;
+                options.particles.size.value = { min: 4, max: 8 };
+                options.particles.opacity.value = 0.2;
+                options.particles.move.direction = "top";
+                options.particles.move.speed = 1;
+            }
+
+            tsParticles.load("tsparticles", options);
+        }
+
+        function startTimer(timerData) {
+            currentTimer = timerData;
+            clearInterval(timerInterval);
+            finishedBanner.classList.add('hidden');
+
+            eventTitle.innerText = timerData.title;
+            eventCategoryText.innerText = timerData.category || 'Событие';
+
+            const targetDate = new Date(timerData.targetDate);
+            const createdDate = timerData.createdAt ? new Date(timerData.createdAt) : new Date();
+
+            const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            eventTargetDate.innerText = targetDate.toLocaleDateString('ru-RU', options);
+
+            initParticles(timerData.bg || 'stars');
+
+            function update() {
+                const now = new Date().getTime();
+                const distance = targetDate.getTime() - now;
+
+                if (distance <= 0) {
+                    clearInterval(timerInterval);
+                    daysVal.innerText = '00';
+                    hoursVal.innerText = '00';
+                    minutesVal.innerText = '00';
+                    secondsVal.innerText = '00';
+                    progressBar.style.width = '100%';
+
+                    finishedBanner.classList.remove('hidden');
+                    playFinishSound();
+                    triggerConfetti();
+                    return;
+                }
+
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                daysVal.innerText = String(days).padStart(2, '0');
+                hoursVal.innerText = String(hours).padStart(2, '0');
+                minutesVal.innerText = String(minutes).padStart(2, '0');
+                secondsVal.innerText = String(seconds).padStart(2, '0');
+
+                // Progress Bar
+                const totalDuration = targetDate.getTime() - createdDate.getTime();
+                const elapsed = now - createdDate.getTime();
+                if (totalDuration > 0) {
+                    const pct = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+                    progressBar.style.width = `${pct}%`;
+                } else {
+                    progressBar.style.width = '0%';
+                }
+            }
+
+            update();
+            timerInterval = setInterval(update, 1000);
+
+            // Update URL hash/params for direct sharing
+            const urlState = btoa(encodeURIComponent(JSON.stringify({
+                t: timerData.title,
+                d: timerData.targetDate,
+                c: timerData.category,
+                b: timerData.bg
+            })));
+            window.location.hash = `timer=${urlState}`;
+        }
+
+        function openModal(modal) {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.firstElementChild.classList.remove('scale-95');
+                modal.firstElementChild.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeModal(modal) {
+            modal.firstElementChild.classList.remove('scale-100');
+            modal.firstElementChild.classList.add('scale-95');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function loadSavedTimers() {
+            const raw = localStorage.getItem('chrono_saved_timers');
+            savedTimers = raw ? JSON.parse(raw) : [];
+            updateSavedBadge();
+        }
+
+        function saveTimersToStorage() {
+            localStorage.setItem('chrono_saved_timers', JSON.stringify(savedTimers));
+            updateSavedBadge();
+        }
+
+        function updateSavedBadge() {
+            const badge = document.getElementById('savedCountBadge');
+            if (savedTimers.length > 0) {
+                badge.innerText = savedTimers.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function renderSavedTimersList() {
+            const list = document.getElementById('savedList');
+            const empty = document.getElementById('emptySavedNotice');
+            list.innerHTML = '';
+
+            if (savedTimers.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+
+            savedTimers.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'p-4 rounded-2xl glass-card flex items-center justify-between hover:border-cyan-500/50 transition cursor-pointer group';
+                
+                const tDate = new Date(item.targetDate);
+                const dateStr = tDate.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                el.innerHTML = `
+                    <div class="flex-1 mr-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">${item.category || 'Событие'}</span>
+                            <span class="text-xs text-slate-400">${dateStr}</span>
+                        </div>
+                        <h4 class="font-bold text-slate-800 dark:text-slate-100 text-sm mt-1 group-hover:text-cyan-500 transition">${item.title}</h4>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button data-action="load" data-index="${index}" class="p-2 rounded-lg bg-cyan-500/10 hover:bg-cyan-500 text-cyan-600 dark:text-cyan-400 transition" title="Открыть">
+                            <i class="fa-solid fa-play text-xs"></i>
+                        </button>
+                        <button data-action="delete" data-index="${index}" class="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-600 dark:text-rose-400 transition" title="Удалить">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                `;
+
+                el.addEventListener('click', (e) => {
+                    const btn = e.target.closest('button');
+                    if (!btn) return;
+
+                    const action = btn.dataset.action;
+                    const idx = parseInt(btn.dataset.index);
+
+                    if (action === 'load') {
+                        startTimer(savedTimers[idx]);
+                        closeModal(savedTimersModal);
+                        showToast('Таймер загружен!');
+                    } else if (action === 'delete') {
+                        savedTimers.splice(idx, 1);
+                        saveTimersToStorage();
+                        renderSavedTimersList();
+                        showToast('Таймер удален');
+                    }
+                });
+
+                list.appendChild(el);
+            });
+        }
+
+        function renderPresets() {
+            const container = document.getElementById('presetsList');
+            container.innerHTML = '';
+
+            presetItems.forEach((preset) => {
+                const target = preset.getDate();
+                const btn = document.createElement('button');
+                btn.className = 'w-full p-4 rounded-2xl glass-card flex items-center justify-between hover:border-cyan-500 transition text-left group';
+
+                btn.innerHTML = `
+                    <div>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">${preset.category}</span>
+                        <h4 class="font-bold text-slate-800 dark:text-slate-100 text-base mt-1 group-hover:text-cyan-500 transition">${preset.title}</h4>
+                        <p class="text-xs text-slate-400 mt-0.5">${target.toLocaleDateString('ru-RU')}</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-400 group-hover:text-cyan-500 group-hover:translate-x-1 transition"></i>
+                `;
+
+                btn.addEventListener('click', () => {
+                    startTimer({
+                        title: preset.title,
+                        targetDate: target.toISOString(),
+                        category: preset.category,
+                        bg: preset.bg,
+                        createdAt: new Date().toISOString()
+                    });
+                    closeModal(presetsModal);
+                    showToast('Запущен пресет!');
+                });
+
+                container.appendChild(btn);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('currentYear').innerText = new Date().getFullYear();
+
+            // Load theme preference
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+
+            // Theme Toggle
+            document.getElementById('themeToggle').addEventListener('click', () => {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.theme = 'light';
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.theme = 'dark';
+                }
+            });
+
+            // BG Choice Buttons
+            document.querySelectorAll('.bgOption').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.bgOption').forEach(b => b.classList.remove('border-cyan-500', 'bg-cyan-500/10'));
+                    btn.classList.add('border-cyan-500', 'bg-cyan-500/10');
+                    selectedBgEffect = btn.dataset.bg;
+                });
+            });
+
+            // Modals Trigger Buttons
+            document.getElementById('newTimerBtn').addEventListener('click', () => {
+                // Set default date picker to tomorrow 12:00
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(12, 0, 0, 0);
+
+                const tzOffset = tomorrow.getTimezoneOffset() * 60000;
+                const localISOTime = (new Date(tomorrow - tzOffset)).toISOString().slice(0, 16);
+                
+                document.getElementById('inputDateTime').value = localISOTime;
+                document.getElementById('inputTitle').value = '';
+                openModal(timerModal);
+            });
+
+            document.getElementById('editBtn').addEventListener('click', () => {
+                if (!currentTimer) return;
+                document.getElementById('inputTitle').value = currentTimer.title;
+                const target = new Date(currentTimer.targetDate);
+                const tzOffset = target.getTimezoneOffset() * 60000;
+                document.getElementById('inputDateTime').value = (new Date(target - tzOffset)).toISOString().slice(0, 16);
+                document.getElementById('inputCategory').value = currentTimer.category || 'Праздник';
+                openModal(timerModal);
+            });
+
+            document.getElementById('presetsBtn').addEventListener('click', () => {
+                renderPresets();
+                openModal(presetsModal);
+            });
+
+            document.getElementById('savedTimersBtn').addEventListener('click', () => {
+                renderSavedTimersList();
+                openModal(savedTimersModal);
+            });
+
+            // Close modals logic
+            document.querySelectorAll('.closeModal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    closeModal(timerModal);
+                    closeModal(presetsModal);
+                    closeModal(savedTimersModal);
+                });
+            });
+
+            // Form Submit
+            document.getElementById('timerForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const title = document.getElementById('inputTitle').value;
+                const dateTimeVal = document.getElementById('inputDateTime').value;
+                const category = document.getElementById('inputCategory').value;
+
+                if (!dateTimeVal) return;
+
+                startTimer({
+                    title: title,
+                    targetDate: new Date(dateTimeVal).toISOString(),
+                    category: category,
+                    bg: selectedBgEffect,
+                    createdAt: new Date().toISOString()
+                });
+
+                closeModal(timerModal);
+                showToast('Таймер установлен!');
+            });
+
+            // Save current timer to localStorage
+            document.getElementById('saveCurrentBtn').addEventListener('click', () => {
+                if (!currentTimer) return;
+                const exists = savedTimers.some(t => t.title === currentTimer.title && t.targetDate === currentTimer.targetDate);
+                if (!exists) {
+                    savedTimers.push(currentTimer);
+                    saveTimersToStorage();
+                    showToast('Таймер сохранён!');
+                } else {
+                    showToast('Таймер уже есть в списке');
+                }
+            });
+
+            // Share current timer via link
+            document.getElementById('shareBtn').addEventListener('click', () => {
+                const url = window.location.href;
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(url);
+                    showToast('Ссылка скопирована!');
+                } else {
+                    // Fallback
+                    const input = document.createElement('input');
+                    input.value = url;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(input);
+                    showToast('Ссылка скопирована!');
+                }
+            });
+
+            // Load Saved Timers State
+            loadSavedTimers();
+
+            let initialTimer = null;
+            if (window.location.hash.startsWith('#timer=')) {
+                try {
+                    const encodedStr = window.location.hash.replace('#timer=', '');
+                    const parsed = JSON.parse(decodeURIComponent(atob(encodedStr)));
+                    if (parsed && parsed.t && parsed.d) {
+                        initialTimer = {
+                            title: parsed.t,
+                            targetDate: parsed.d,
+                            category: parsed.c || 'Событие',
+                            bg: parsed.b || 'stars',
+                            createdAt: new Date().toISOString()
+                        };
+                    }
+                } catch (e) {
+                    console.error("Invalid URL Hash State", e);
+                }
+            }
+
+            // Fallback to default timer (New Year)
+            if (!initialTimer) {
+                const defaultPreset = presetItems[0];
+                initialTimer = {
+                    title: defaultPreset.title,
+                    targetDate: defaultPreset.getDate().toISOString(),
+                    category: defaultPreset.category,
+                    bg: defaultPreset.bg,
+                    createdAt: new Date().toISOString()
+                };
+            }
+
+            startTimer(initialTimer);
+        });
+    </script>
+</body>
+</html>
